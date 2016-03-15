@@ -1,0 +1,698 @@
+*** Settings ***
+Resource          super.txt
+
+*** Keywords ***
+Verify and Validate the Attributes in Activity Details that Belongs to the Activity
+    [Arguments]    ${ActivityName}    ${ListOfAttributeValues}
+    [Documentation]    1. To get Attribute field name's from Activity Details Dialog box.
+    ...
+    ...    2. Verified and validated the Attribute Values which belongs to specified Activity given in advanced search field of Activity on Alerts page.
+    ${countOfRows}    Get Matching Xpath Count    //div[@id='availableFields']/div/div
+    ${expectedList}    Create List
+    : FOR    ${item}    IN RANGE    1    ${countOfRows}+1
+    \    ${innerRowCount}    Get Matching Xpath Count    //div[@id='availableFields']/div/div[${item}]/div
+    \    ${item1}    Set Variable    1
+    \    Wait For Element Visible    //div[@id='availableFields']/div/div[${item}]/div[${item1}]//label
+    \    ${b}    CommonLibrary.Get Text    //div[@id='availableFields']/div/div[${item}]/div[${item1}]//label
+    \    Append To List    ${expectedList}    ${b}
+    \    ${c}    Run Keyword If    ${innerRowCount}>2    CommonLibrary.Get Text    //div[@id='availableFields']/div/div[${item}]/div[${item1}+2]//label
+    \    Run Keyword If    ${innerRowCount}>2    Append To List    ${expectedList}    ${c}
+    Log    ${expectedList}
+    ${status}    Run Keyword And Return Status    Lists Should Be Equal    ${expectedList}    ${ListOfAttributeValues}
+    Run Keyword If    '${status}'!='True'    Fail    Activity Details dialog box does not have related attributes fields for Specified "${ActivityName}" Name.
+    Wait For Element Visible    ${button.alerts.activityDetailsDialogOk}
+    Click Element    ${button.alerts.activityDetailsDialogOk}
+    Sleep    3s
+    Return From Keyword    Pass
+
+Validate Activity Details Field Values in Details Field
+    [Arguments]    ${fieldsToBeCheckedandValuesfortheFields}
+    @{fieldNames}=    Get Dictionary Keys    ${fieldsToBeCheckedandValuesfortheFields}
+    @{valuesToEnterforFieldNames}=    Get Dictionary Values    ${fieldsToBeCheckedandValuesfortheFields}
+    ${lenOfList}=    Get Length Of List    @{fieldNames}
+
+Validate Details Field is checked after Selecting the Fields on Activity Details Window
+    [Arguments]    ${fieldsToBeCheckedandValuesfortheFields}
+    ${fields}=    Get Dictionary Keys    ${fieldsToBeCheckedandValuesfortheFields}
+    @{values}=    Get Dictionary Values    ${fieldsToBeCheckedandValuesfortheFields}
+    ${lenOfList}=    Get Length Of List    ${fields}
+    Set Suite Variable    ${lenOfList}    ${lenOfList}
+    @{fields}=    Set Variable    ${fields}
+    Set Suite Variable    @{fields}
+    ${fieldNameandValue}=    Create List
+    : FOR    ${iCnt}    IN RANGE    0    ${lenOfList}
+    \    Input Text    //label[contains(text(),'@{fields}[${iCnt}]')]/parent::div/following-sibling::div/input    @{values}[${iCnt}]
+    \    Wait Until Page Contains Element    //table[@id='filterAdvancedActivityFieldsDialogContentTable']//div[@class='dialogFooter']    ${DELAY}
+    \    Click Element    //table[@id='filterAdvancedActivityFieldsDialogContentTable']//div[@class='dialogFooter']
+    \    Sleep    1s
+    \    Wait Until Page Contains Element    //label[contains(text(),'@{fields}[${iCnt}]')]/parent::div/input    ${DELAY}
+    \    ${bStatus}=    Run Keyword And Return Status    Checkbox Should Be Selected    //label[contains(text(),'@{fields}[${iCnt}]')]/parent::div/input
+    \    Run Keyword If    ${bStatus}!=True    Click Element    //label[contains(text(),'@{fields}[${iCnt}]')]/parent::div/input
+    \    Append To List    ${fieldNameandValue}    @{fields}[${iCnt}]:${SPACE}@{values}[${iCnt}]
+    Set Suite Variable    ${fieldNameandValue}    ${fieldNameandValue}
+    Click Element    //table[@id='filterAdvancedActivityFieldsDialogContentTable']//div[@class='dialogFooter']//a[contains(text(),'Ok')]
+    Sleep    2s
+    Wait Until Page Contains Element    //label[contains(text(),'Details')]/parent::div/input    ${DELAY}    Advance Search Area is not displayed after Clicking Ok on Activity details window.
+    ${bStatus}=    Run Keyword And Return Status    Checkbox Should Be Selected    //label[contains(text(),'Details')]/parent::div/input
+    Run Keyword If    ${bStatus}!=True    Fail    Details Check box is not checked \ after Entering values for the Activity Details Fields and checking the Fields.
+    ${textDisplayedOnDetailsArea}=    CommonLibrary.Get Text    activityFieldList
+    @{fieldNameandValue}=    Set Variable    ${fieldNameandValue}
+    : FOR    ${fieldNameandValueCombined}    IN    @{fieldNameandValue}
+    \    Should Contain    ${textDisplayedOnDetailsArea}    ${fieldNameandValueCombined}    The value ${fieldNameandValue} is not displayed on Details area.
+    Sleep    2s
+
+Get Label Matching List Values From Activity Pane
+    [Arguments]    ${activitiesCount}    ${labelName}
+    ${labelName}    Set Variable    ${labelName}
+    ${ExpectedInnerList}    Create List
+    : FOR    ${iCounter}    IN RANGE    0    ${activitiesCount}
+    \    ${Status}    Verify Element Present    //div[@id='activityListContainer']//tr[@id='ga_activityDetails_body_row__${iCounter}']//div[contains(@id,'ga_activityDetails_body__${iCounter}')]//td[contains(text(),'${labelName}')]
+    \    ${values}    Run Keyword If    '${Status}'=='True'    CommonLibrary.Get Text    //div[@id='activityListContainer']//tr[contains(@id,'ga_activityDetails_body_row__${iCounter}')]//td[contains(text(),'${labelName}')]//following-sibling::td
+    \    Comment    ${values}    Run Keyword If    ${Status}    CommonLibrary.Get Text    //div[@id='activityListContainer']//tr[contains(@id,'ga_activityDetails_body_row')]//td[contains(text(),'${labelName}')]//following-sibling::td
+    \    Run Keyword If    ${Status}    Append To List    ${ExpectedInnerList}    ${values}
+    [Return]    ${ExpectedInnerList}
+
+Get Short Name For Activity Type From Rich List
+    [Arguments]    ${ActivityType}    ${FullNameActivityType}
+    [Documentation]    It will returns short name for activity type which we entered From rich dropdown list
+    Wait For Element Visible    ${text.advanceSearch.activity}    ${DELAY}
+    Input Text    ${text.advanceSearch.activity}    ${ActivityType}
+    Wait Until Element Is Visible    //div[contains(@id,'mainForm:activitySuggestionsV5') and contains(@class,'rich-sb-common-container')]    ${DELAY}
+    ${countOfRichList}    Get Matching Xpath Count    //div[contains(@id,'mainForm:activitySuggestionsV5') and contains(@class,'rich-sb-common-container')]//table[@id='mainForm:activitySuggestionsV5:suggest']//tr
+    : FOR    ${iCounter}    IN RANGE    1    ${countOfRichList}+1
+    \    ${text}    CommonLibrary.Get Text    //div[contains(@id,'mainForm:activitySuggestionsV5') and contains(@class,'rich-sb-common-container')]//table[@id='mainForm:activitySuggestionsV5:suggest']//tr[${iCounter}]
+    \    ${presentStatus}    Run Keyword And Return Status    Should Contain    ${text}    ${FullNameActivityType}
+    \    ${shortName}    Run Keyword If    ${presentStatus}    Replace String Using Regexp    ${text}    ${FullNameActivityType}
+    \    ...    ${EMPTY}
+    \    Run Keyword If    ${presentStatus}    Exit For Loop
+    \    Sleep    1s
+    Log    ${shortName}
+    [Return]    ${shortName}
+
+Get Activity body Values Based Upon Activity Short Name
+    [Arguments]    ${ActivityShortNameName}    ${valuesList}
+    ${labelName}    Set Variable    ${ActivityShortNameName}
+    @{valuesList}    Set Variable    ${valuesList}
+    ${ExpectedInnerList}    Create List
+    : FOR    ${item}    IN    @{valuesList}
+    \    ${Status}    Verify Element Present    //div[@id='activityListContainer']//tr[contains(@id,'ga_activityDetails_title_row__')]//span[contains(text(),'${ActivityShortNameName}')]
+    \    ${values}    Run Keyword If    ${Status}    CommonLibrary.Get Text    //div[@id='activityListContainer']//tr[contains(@id,'ga_activityDetails_title_row__')]//span[contains(text(),'${ActivityShortNameName}')]//parent::td//parent::tr/following-sibling::tr[contains(@id,'ga_activityDetails_body_row__')]//td[contains(text(),'${item}')]//following-sibling::td
+    \    Run Keyword If    ${Status}    Append To List    ${ExpectedInnerList}    ${values}
+    [Return]    ${ExpectedInnerList}
+
+Activity Details Searching Alerts_Search Options All
+    Login to Application    ${SUBDOMAINURL}    ${subdomainuser}    ${subdomainuserpassword}
+    MenuSelect    Alerts
+    ${filters}=    Create Dictionary    Activity=ACHSubOneTime
+    Enter And Validate Single Advanced Search Field    ${filters}    False
+    ${valuInActivityField}    Get Element Attribute Value    ${text.advanceSearch.activityValue}
+    Wait For Element Visible    ${button.advanceSearch.edit}    ${DELAY}
+    Click Element    ${button.advanceSearch.edit}
+    Sleep    ${Delay2}
+    Wait For Element Visible    ${list.activityDetailsDialog.findSessions}    ${DELAY}
+    Select From List By Label    ${list.activityDetailsDialog.findSessions}    All
+    Comment    ${actualList}    Create List    hMxcyBZFd4NafT6JCIhyOQ==    PP5nZOeA6gcy12U9ImSI5w==
+    Comment    ${actualList}    Create List    4000545311    435011171713
+    Comment    ${actualList}    Create List    LP2tuKH+F5ga2ScBuGR+iw==    o3sjZq1UbrMAArUWHe3pjA==
+    Comment    ${labelsList}    Create List    From Account:    To Account:
+    Comment    Wait For Element Visible    ${text.activityDetailsDialog.fromAccount}    ${DELAY}
+    Comment    Input Text    ${text.activityDetailsDialog.fromAccount}    4000545311
+    Comment    Input Text    ${text.activityDetailsDialog.toAccount}    435011171713
+    ${actualList}    Create List    37.00
+    ${labelsList}    Create List    Total Credit Amount:
+    Input Text    //label[contains(text(),'Total Credit Amount')]/parent::div/following-sibling::div/input    37.00
+    Wait For Element Visible    ${button.alerts.activityDetailsDialogOk}    ${DELAY}
+    Click or Simulate    ${button.alerts.activityDetailsDialogOk}
+    Sleep    ${DELAY5}
+    Wait For Element Visible    //a[contains(text(),'Show Results')]    ${DELAY}
+    Comment    Waitng for the selected record.
+    Click or Simulate    //a[contains(text(),'Show Results')]
+    Wait Until Keyword Succeeds    1m    100ms    Any One Element Should Be Visible    //a[@title='Account Detail']    ${label.reports.dataTable.noMatchingData}
+    Wait For Element Visible    ${label.alerts.selectedRecord}    ${DELAY}
+    ${bstatus}=    Verify Element Present    ${label.reports.dataTable.noMatchingData}
+    Run Keyword And Continue On Failure    Run Keyword If    ${bstatus}==True    Fail    No Matching Data Found
+    ${tableColNo}    Get Column No From Table    ${table.alerts.matchingRows}    Account
+    ${account}=    Get Cell Value    ${table.alerts.matchingRows}    ${tableColNo}    1
+    Comment    Select an account which has more number of sessions
+    Select Item and view account detail    ${account}
+    Select Window    ${windowName}
+    Sleep    ${DELAY5}
+    Wait For Element Visible    ${label.accountDetail.activitiesPane.activitiesHeaderTitle}    ${DELAY}
+    ${ExpectedList}    Create List
+    ${activitiesCount}    CommonLibrary.Get Text    ${label.accountDetail.activitiesPane.activitiesHeaderTitle}
+    @{activitiesCount}    Split String    ${activitiesCount}    (
+    ${activitiesCount}    Replace String    @{activitiesCount}[1]    )    ${EMPTY}
+    @{labelsList}    Set Variable    ${labelsList}
+    : FOR    ${labelName}    IN    @{labelsList}
+    \    ${list}    Get Label Matching List Values From Activity Pane    ${activitiesCount}    ${labelName}
+    \    ${list}    Remove Duplicates    ${list}
+    \    ${ExpectedList}    Combine Lists    ${ExpectedList}    ${list}
+    Comment    Validatation for ALL option.
+    @{ExpectedList}    Set Variable    ${ExpectedList}
+    : FOR    ${item}    IN    @{ExpectedList}
+    \    ${status}    Run Keyword And Return Status    List Should Contain Value    ${actualList}    ${item}
+    \    Run Keyword If    '${status}'!='True'    Fail    The "${item}" Item must be Present in Actual list as expected,But it is not.
+    Sleep    ${Delay2}
+    Logout
+    [Teardown]    Stop Application
+
+Activity Details Searching FraudMatch_Floating Point on Amount field
+    Login to Application    ${SUBDOMAINURL}    ${subdomainuser}    ${subdomainuserpassword}
+    MenuSelect    Alerts
+    Wait For Element Visible    ${button.alerts.showResults}    ${DELAY}
+    Click Element    ${button.alerts.showResults}
+    Wait Until Keyword Succeeds    1m    100ms    Any One Element Should Be Visible    //a[@title='Account Detail']    ${label.reports.dataTable.noMatchingData}
+    Comment    Sleep    10s
+    Comment    navigate to fraud match screen
+    ${tableColNo}    Get Column No From Table    ${table.fraudMatch.matchingRows}    Account
+    ${account}=    Get Cell Value    ${table.fraudMatch.matchingRows}    ${tableColNo}    2
+    Left Click On Table Row    ${table.alerts.matchingRows}    ${tableColNo}    ${account}
+    Wait For Element Visible    ${image.alerts.fraudMatchAction}    ${DELAY}
+    Click Element    ${image.alerts.fraudMatchAction}
+    Wait For Please Wait Option
+    Sleep    ${DELAY5}
+    Wait For New Window    2
+    @{windowTitles}=    Get Window Titles
+    Select Window    @{windowTitles}[1]
+    Maximize Browser Window
+    Wait For Element Visible    ${list.alerts.date}    ${DELAY}
+    Select From List By Label    ${list.alerts.date}    All Time
+    Sleep    3s
+    Wait For Element Visible    ${text.reports.advanceSearchSessionRange}    ${DELAY}
+    Simulate    ${link.common.riskRedAndYellow}    click
+    Sleep    4s
+    ${filters}=    Create Dictionary    Activity=Info
+    Enter And Validate Single Advanced Search Field    ${filters}    False    False
+    ${valuInActivityField}    Get Element Attribute Value    ${text.advanceSearch.activityValue}
+    ${ActualBelongedActivityList}    Create List    Account Number    Amount    From Account    From Account Type    Routing Number
+    ...    To Account
+    Wait For Element Visible    ${button.advanceSearch.edit}    ${DELAY}
+    Click Element    ${button.advanceSearch.edit}
+    Sleep    4s
+    Wait For Element Visible    ${table.alerts.filterAdvancedActivityFieldsDialog}    ${DELAY}
+    ${statusOfValidation1}    Verify and Validate the Attributes in Activity Details that Belongs to the Activity    ${valuInActivityField}    ${ActualBelongedActivityList}
+    Run Keyword If    '${statusOfValidation1}'!='Pass'    Fail    Activity Details dialog box does not have related attributes fields for Specified "${valuInActivityField}" Name.
+    Comment    Enter the Amount value by placing '- ' before entering the value in ammount Field of Edit Dialog box.
+    Wait For Element Visible    ${button.advanceSearch.edit}    ${DELAY}
+    Click Element    ${button.advanceSearch.edit}
+    Sleep    3s
+    Wait For Element Visible    ${table.alerts.filterAdvancedActivityFieldsDialog}    ${DELAY}
+    Input Text    ${text.activityDetailDialog.amount}    10
+    Click Element    ${button.alerts.activityDetailsDialogOk}
+    Sleep    3s
+    Wait For Element Visible    //a[contains(text(),'Show Results')]    ${DELAY}
+    Click Element    //a[contains(text(),'Show Results')]
+    Wait Until Keyword Succeeds    1m    100ms    Any One Element Should Be Visible    //a[@title='Account Detail']    ${label.reports.dataTable.noMatchingData}
+    Comment    Sleep    10s
+    Rest Default Columns
+    Sleep    ${DELAY5}
+    Wait For Element Visible    ${label.alerts.selectedRecord}    ${DELAY}
+    ${bstatus}=    Verify Element Present    ${label.reports.dataTable.noMatchingData}
+    Run Keyword And Continue On Failure    Run Keyword If    ${bstatus}==True    Fail    No Matching Data Found
+    ${tableColNo}    Get Column No From Table    ${table.fraudMatch.matchingRows}    Account
+    ${account}=    Get Cell Value    ${table.fraudMatch.matchingRows}    ${tableColNo}    1
+    Comment    Select an account which has more number of sessions
+    Select Item and view account detail from fraudMatch    ${account}
+    Select Window    ${windowName}
+    Sleep    4s
+    Comment    Validate the account detail page opened or not
+    Wait For Element Visible    ${label.accountDetail.activitiesPane.activitiesHeaderTitle}    ${DELAY}
+    ${ExpectedList}    Create List
+    ${activitiesCount}    CommonLibrary.Get Text    ${label.accountDetail.activitiesPane.activitiesHeaderTitle}
+    @{activitiesCount}    Split String    ${activitiesCount}    (
+    ${activitiesCount}    Replace String    @{activitiesCount}[1]    )    ${EMPTY}
+    Comment    Check the Amount in Activity pane of accountdetail page is lessthan the given Value.
+    @{list}    Get Label Matching List Values From Activity Pane    ${activitiesCount}    Amount:
+    ${countOfAmount}    Set Variable    0
+    : FOR    ${item}    IN    @{list}
+    \    ${status}    Evaluate    ${item}==10
+    \    ${countOfAmount}    Run Keyword If    ${status}    Evaluate    ${countOfAmount}+1
+    \    ...    ELSE    Evaluate    ${countOfAmount}+0
+    \    Comment    ${countOfAmount}    Run Keyword If    ${status}    Set Variable    ${countOfAmount}+1
+    \    ...    ELSE    Set Variable    ${countOfAmount}
+    \    Comment    Run Keyword If    '${status}'!='True'    Fail    The resultant value in Activity pane ${list} is not equal to 10. It is not expected behaviour.
+    ${status}    Evaluate    ${countOfAmount}>=1
+    Run Keyword If    '${status}'!='True'    Fail    The Amount value in Activity pane does not contain 10. It doesn't having atleast one time.
+    Logout
+    Stop Application
+    Login to Application    ${SUBDOMAINURL}    ${subdomainuser}    ${subdomainuserpassword}
+    MenuSelect    Alerts
+    Click Element    ${button.alerts.showResults}
+    Wait Until Keyword Succeeds    1m    100ms    Any One Element Should Be Visible    //a[@title='Account Detail']    ${label.reports.dataTable.noMatchingData}
+    Comment    Sleep    10s
+    Comment    navigate to fraud match screen
+    ${tableColNo}    Get Column No From Table    ${table.fraudMatch.matchingRows}    Account
+    ${account}=    Get Cell Value    ${table.fraudMatch.matchingRows}    ${tableColNo}    2
+    Left Click On Table Row    ${table.alerts.matchingRows}    ${tableColNo}    ${account}
+    Wait For Element Visible    ${image.alerts.fraudMatchAction}    ${DELAY}
+    Click Element    ${image.alerts.fraudMatchAction}
+    Sleep    2s
+    @{windowTitles}=    Get Window Titles
+    Select Window    @{windowTitles}[1]
+    Maximize Browser Window
+    Wait For Element Visible    ${list.alerts.date}    ${DELAY}
+    Select From List By Label    ${list.alerts.date}    All Time
+    Sleep    3s
+    Wait For Element Visible    ${text.reports.advanceSearchSessionRange}    ${DELAY}
+    Simulate    ${link.common.riskRedAndYellow}    click
+    Sleep    4s
+    ${resetStatus}    Verify Element Visible    ${button.reports.advSearchReset}
+    Run Keyword If    '${resetStatus}'!='True'    Click Element    ${button.alerts.advanceSearch}
+    Sleep    5s
+    Wait For Element Visible    ${image.fraudMatch.reset}    ${DELAY}
+    Click Element    ${image.fraudMatch.reset}
+    Sleep    2s
+    Wait For Element Visible    ${button.advanceSearch.edit}    ${DELAY}
+    Click Element    ${button.advanceSearch.edit}
+    Sleep    5s
+    Wait For Element Visible    ${table.alerts.filterAdvancedActivityFieldsDialog}    ${DELAY}
+    Input Text    ${text.activityDetailDialog.amount}    10.00
+    Wait For Element Visible    ${button.alerts.activityDetailsDialogOk}    ${DELAY}
+    Click Element    ${button.alerts.activityDetailsDialogOk}
+    Sleep    3s
+    Wait For Element Visible    //a[contains(text(),'Show Results')]    ${DELAY}
+    Click Element    //a[contains(text(),'Show Results')]
+    Wait Until Keyword Succeeds    1m    100ms    Any One Element Should Be Visible    //a[@title='Account Detail']    ${label.reports.dataTable.noMatchingData}
+    Comment    Sleep    10s
+    Wait For Element Visible    ${label.alerts.selectedRecord}    ${DELAY}
+    ${bstatus}=    Verify Element Present    ${label.reports.dataTable.noMatchingData}
+    Run Keyword And Continue On Failure    Run Keyword If    ${bstatus}==True    Fail    No Matching Data Found
+    ${tableColNo}    Get Column No From Table    ${table.fraudMatch.matchingRows}    Account
+    ${account}=    Get Cell Value    ${table.fraudMatch.matchingRows}    ${tableColNo}    1
+    Comment    Select an account which has more number of sessions
+    Select Item and view account detail from fraudMatch    ${account}
+    Select Window    ${windowName}
+    Sleep    4s
+    Comment    Validate the account detail page opened or not
+    Wait For Element Visible    ${label.accountDetail.activitiesPane.activitiesHeaderTitle}    ${DELAY}
+    ${ExpectedList}    Create List
+    ${activitiesCount}    CommonLibrary.Get Text    ${label.accountDetail.activitiesPane.activitiesHeaderTitle}
+    @{activitiesCount}    Split String    ${activitiesCount}    (
+    ${activitiesCount}    Replace String    @{activitiesCount}[1]    )    ${EMPTY}
+    Comment    Check the Amount in Activity pane of accountdetail page is lessthan the given Value.
+    @{list}    Get Label Matching List Values From Activity Pane    ${activitiesCount}    Amount
+    ${countOfAmount}    Set Variable    0
+    : FOR    ${item}    IN    @{list}
+    \    ${status}    Evaluate    ${item}==10.00
+    \    ${countOfAmount}    Run Keyword If    ${status}    Evaluate    ${countOfAmount}+1
+    \    ...    ELSE    Evaluate    ${countOfAmount}+0
+    \    Comment    Run Keyword If    '${status}'!='True'    Fail    The resultant value in Activity pane ${list} is not equal to 10. It is not expected behaviour.
+    ${status}    Evaluate    ${countOfAmount}>=1
+    Run Keyword If    '${status}'!='True'    Fail    The Amount value in Activity pane does not contain 10. It doesn't having atleast one time.
+    Logout
+    [Teardown]    Stop Application
+
+Activity Details Searching FraudMatch_Search Options Any
+    Login to Application    ${SUBDOMAINURL}    ${subdomainuser}    ${subdomainuserpassword}
+    MenuSelect    Alerts
+    Wait For Element Visible    ${button.alerts.showResults}    ${DELAY}
+    Click Element    ${button.alerts.showResults}
+    Wait Until Keyword Succeeds    1m    100ms    Any One Element Should Be Visible    ${image.alerts.fraudMatchAction}    ${label.reports.dataTable.noMatchingData}
+    Comment    navigate to fraud match screen
+    ${tableColNo}    Get Column No From Table    ${table.fraudMatch.matchingRows}    Account
+    ${account}=    Get Cell Value    ${table.fraudMatch.matchingRows}    ${tableColNo}    2
+    Left Click On Table Row    ${table.alerts.matchingRows}    ${tableColNo}    ${account}
+    Wait For Element Visible    ${image.alerts.fraudMatchAction}
+    Click Element    ${image.alerts.fraudMatchAction}
+    Sleep    2s
+    @{windowTitles}=    Get Window Titles
+    Select Window    @{windowTitles}[1]
+    Maximize Browser Window
+    Wait For Element Visible    ${list.alerts.date}
+    Select From List By Label    ${list.alerts.date}    All Time
+    Sleep    3s
+    Wait For Element Visible    ${text.reports.advanceSearchSessionRange}    ${DELAY}
+    Simulate    ${link.common.riskRedAndYellow}    click
+    Sleep    4s
+    Comment    Verified and Validated the search fields in Activity Dialog box for the Activity name "ACHSubOneTime".
+    ${filters}=    Create Dictionary    Activity=ACHSubOneTime
+    Enter And Validate Single Advanced Search Field    ${filters}    False
+    ${valuInActivityField}    Get Element Attribute Value    ${text.advanceSearch.activityValue}
+    Click Element    ${button.advanceSearch.edit}
+    Sleep    2s
+    Wait For Element Visible    ${table.alerts.filterAdvancedActivityFieldsDialog}    ${DELAY}
+    Select From List By Label    ${list.activityDetailsDialog.findSessions}    Any
+    ${actualList}    Create List    1000.00
+    ${labelsList}    Create List    Total Credit Amount:
+    Input Text    //label[contains(text(),'Total Credit Amount')]/parent::div/following-sibling::div/input    1000.00
+    Comment    Input Text    ${text.activityDetailsDialog.toAccount}    35011171713
+    Comment    Wait For Element Visible    ${text.activityDetailsDialog.toAccount}    ${DELAY}
+    Click Element    ${button.alerts.activityDetailsDialogOk}
+    Sleep    5s
+    Wait For Element Visible    ${button.alerts.showResults}    ${DELAY}
+    Comment    Waitng for the selected record.
+    Simulate Or Click Element    //a[contains(text(),'Show Results')]
+    Wait Until Keyword Succeeds    1m    100ms    Any One Element Should Be Visible    ${image.alerts.fraudMatchAction}    ${label.reports.dataTable.noMatchingData}
+    Rest Default Columns
+    Sleep    ${DELAY5}
+    Wait For Element Visible    ${label.alerts.selectedRecord}    ${DELAY}
+    ${bstatus}=    Verify Element Present    ${label.reports.dataTable.noMatchingData}
+    Run Keyword And Continue On Failure    Run Keyword If    ${bstatus}==True    Fail    No Matching Data Found
+    ${tableColNo}    Get Column No From Table    ${table.fraudMatch.matchingRows}    Account
+    ${account}=    Get Cell Value    ${table.fraudMatch.matchingRows}    ${tableColNo}    2
+    Comment    Select an account which has more number of sessions
+    Select Item and view account detail from fraudMatch    ${account}
+    Select Window    ${windowName}
+    Sleep    4s
+    Wait For Element Visible    ${label.accountDetail.activitiesPane.activitiesHeaderTitle}    ${DELAY}
+    ${ExpectedList}    Create List
+    ${activitiesCount}    CommonLibrary.Get Text    ${label.accountDetail.activitiesPane.activitiesHeaderTitle}
+    @{activitiesCount}    Split String    ${activitiesCount}    (
+    ${activitiesCount}    Replace String    @{activitiesCount}[1]    )    ${EMPTY}
+    @{labelsList}    Set Variable    ${labelsList}
+    : FOR    ${labelName}    IN    @{labelsList}
+    \    ${list}    Get Label Matching List Values From Activity Pane    ${activitiesCount}    ${labelName}
+    \    ${list}    Remove Duplicates    ${list}
+    \    ${ExpectedList}    Combine Lists    ${ExpectedList}    ${list}
+    Comment    Validatation for Any option.
+    @{ExpectedList}    Set Variable    ${ExpectedList}
+    ${count}    Set Variable    0
+    : FOR    ${item}    IN    @{ExpectedList}
+    \    ${status}    Run Keyword And Return Status    List Should Contain Value    ${actualList}    ${item}
+    \    ${count}    Run Keyword If    ${status}    Evaluate    ${count}+1
+    \    ...    ELSE    Set Variable    ${count}
+    \    ${statusOfEvalute}    Run Keyword If    ${status}    Evaluate    ${count}==1
+    \    Run Keyword If    ${statusOfEvalute}    Set Test Message    The "${item}" Item may or may not \ be Present in Actual list as expected,But it is not.
+    \    Run Keyword If    ${statusOfEvalute}    Exit For Loop
+    Run Keyword If    ${count}<1    Fail    There is no single item present in Actual list as expected,But it is not.
+    Logout
+    [Teardown]    Stop Application
+
+Activity Details Searching FraudMatch_Search Options All
+    Login to Application    ${SUBDOMAINURL}    ${subdomainuser}    ${subdomainuserpassword}
+    MenuSelect    Alerts
+    Wait For Element Visible    ${button.alerts.showResults}    ${DELAY}
+    Click Element    ${button.alerts.showResults}
+    Wait Until Keyword Succeeds    1m    100ms    Any One Element Should Be Visible    ${image.alerts.fraudMatchAction}    ${label.reports.dataTable.noMatchingData}
+    Comment    navigate to fraud match screen
+    ${tableColNo}    Get Column No From Table    ${table.fraudMatch.matchingRows}    Account
+    ${account}=    Get Cell Value    ${table.fraudMatch.matchingRows}    ${tableColNo}    2
+    Left Click On Table Row    ${table.alerts.matchingRows}    ${tableColNo}    ${account}
+    Wait For Element Visible    ${image.alerts.fraudMatchAction}
+    Click Element    ${image.alerts.fraudMatchAction}
+    Sleep    2s
+    @{windowTitles}=    Get Window Titles
+    Select Window    @{windowTitles}[1]
+    Maximize Browser Window
+    Wait For Element Visible    ${list.alerts.date}    ${DELAY}
+    Select From List By Label    ${list.alerts.date}    All Time
+    Sleep    3s
+    Wait For Element Visible    ${text.reports.advanceSearchSessionRange}    ${DELAY}
+    Simulate    ${link.common.riskRedAndYellow}    click
+    Sleep    4s
+    ${filters}=    Create Dictionary    Activity=ACHSubOneTime
+    Enter And Validate Single Advanced Search Field    ${filters}    False
+    ${valuInActivityField}    Get Element Attribute Value    ${text.advanceSearch.activityValue}
+    Click Element    ${button.advanceSearch.edit}
+    Sleep    2s
+    Wait For Element Visible    ${list.activityDetailsDialog.findSessions}    ${DELAY}
+    Select From List By Label    ${list.activityDetailsDialog.findSessions}    All
+    ${actualList}    Create List    1000.00
+    ${labelsList}    Create List    Total credit Amount:
+    Comment    Input Text    ${text.activityDetailsDialog.fromAccount}    4000545311
+    Comment    Input Text    ${text.activityDetailsDialog.toAccount}    435011171713
+    Click Element    ${button.alerts.activityDetailsDialogOk}
+    Sleep    5s
+    Wait For Element Visible    //a[contains(text(),'Show Results')]    ${DELAY}
+    Comment    Waitng for the selected record.
+    Click Element    //a[contains(text(),'Show Results')]
+    Wait Until Keyword Succeeds    1m    100ms    Any One Element Should Be Visible    ${image.alerts.fraudMatchAction}    ${label.reports.dataTable.noMatchingData}
+    Rest Default Columns
+    Sleep    ${DELAY5}
+    Wait For Element Visible    ${label.alerts.selectedRecord}    ${DELAY}
+    ${bstatus}=    Verify Element Present    ${label.reports.dataTable.noMatchingData}
+    Run Keyword And Continue On Failure    Run Keyword If    ${bstatus}==True    Fail    No Matching Data Found
+    ${tableColNo}    Get Column No From Table    ${table.fraudMatch.matchingRows}    Account
+    ${account}=    Get Cell Value    ${table.fraudMatch.matchingRows}    ${tableColNo}    1
+    Comment    Select an account which has more number of sessions
+    Select Item and view account detail from fraudMatch    ${account}
+    Select Window    ${windowName}
+    Sleep    4s
+    Wait For Element Visible    ${label.accountDetail.activitiesPane.activitiesHeaderTitle}    ${DELAY}
+    ${ExpectedList}    Create List
+    ${activitiesCount}    CommonLibrary.Get Text    ${label.accountDetail.activitiesPane.activitiesHeaderTitle}
+    @{activitiesCount}    Split String    ${activitiesCount}    (
+    ${activitiesCount}    Replace String    @{activitiesCount}[1]    )    ${EMPTY}
+    @{labelsList}    Set Variable    ${labelsList}
+    : FOR    ${labelName}    IN    @{labelsList}
+    \    ${list}    Get Label Matching List Values From Activity Pane    ${activitiesCount}    ${labelName}
+    \    ${list}    Remove Duplicates    ${list}
+    \    ${ExpectedList}    Combine Lists    ${ExpectedList}    ${list}
+    Comment    Validatation for ALL option.
+    @{ExpectedList}    Set Variable    ${ExpectedList}
+    : FOR    ${item}    IN    @{ExpectedList}
+    \    ${status}    Run Keyword And Return Status    List Should Contain Value    ${actualList}    ${item}
+    \    Run Keyword If    '${status}'!='True'    Fail    The "${item}" Item must be Present in Actual list as expected,But it is not.
+    Sleep    2s
+    Logout
+    [Teardown]    Stop Application
+
+Activity Details Searching FraudMatch Activities displayed on Account Detail page
+    Login to Application    ${SUBDOMAINURL}    ${subdomainuser}    ${subdomainuserpassword}
+    MenuSelect    Alerts
+    Wait For Element Visible    ${button.alerts.showResults}    5s
+    Click Element    ${button.alerts.showResults}
+    Wait Until Keyword Succeeds    1m    100ms    Any One Element Should Be Visible    //a[@title='Account Detail']    ${label.reports.dataTable.noMatchingData}
+    Comment    Sleep    15s
+    Comment    navigate to fraud match screen
+    ${tableColNo}    Get Column No From Table    ${table.fraudMatch.matchingRows}    Account
+    ${account}=    Get Cell Value    ${table.fraudMatch.matchingRows}    ${tableColNo}    2
+    Left Click On Table Row    ${table.alerts.matchingRows}    ${tableColNo}    ${account}
+    Wait For Element Visible    ${image.alerts.fraudMatchAction}    ${DELAY}
+    Click Element    ${image.alerts.fraudMatchAction}
+    Wait For Please Wait Option
+    Sleep    ${DELAY5}
+    Wait For New Window    2
+    @{windowTitles}=    Get Window Titles
+    Select Window    @{windowTitles}[1]
+    Maximize Browser Window
+    Wait For Element Visible    ${list.alerts.date}    ${DELAY}
+    Select From List By Label    ${list.alerts.date}    All Time
+    Sleep    3s
+    Wait For Element Visible    ${text.reports.advanceSearchSessionRange}    ${DELAY}
+    Simulate    ${link.common.riskRedAndYellow}    click
+    Sleep    4s
+    ${resetStatus}    Verify Element Visible    ${button.reports.advSearchReset}
+    Run Keyword If    '${resetStatus}'!='True'    Click Element    ${button.alerts.advanceSearch}
+    Sleep    5s
+    Comment    Verified and Validated the search fields in Activity Dialog box for the sample Activity name "ACHSubOneTime" as default
+    ${shortName}    Get Short Name For Activity Type From Rich List    ACH    ACHSubOneTime
+    ${shortName}    Set Variable    ${shortName.lstrip(${SPACE})}
+    ${filters}=    Create Dictionary    Activity    ACHSubOneTime
+    Enter And Validate Single Advanced Search Field    ${filters}    False    False
+    Sleep    4s
+    ${valuInActivityField}    Get Element Attribute Value    ${text.advanceSearch.activityValue}
+    ${ActualBelongedActivityList}    Create List    Total Credit Amount
+    Click Element    ${button.advanceSearch.edit}
+    Sleep    5s
+    Wait For Element Visible    ${table.alerts.filterAdvancedActivityFieldsDialog}    ${DELAY}
+    ${statusOfActivityBelongs}    Verify and Validate the Attributes in Activity Details that Belongs to the Activity    ${valuInActivityField}    ${ActualBelongedActivityList}
+    Run Keyword If    '${statusOfActivityBelongs}'!='Pass'    Fail    Activity Details dialog box does not have related attributes fields for Specified "${valuInActivityField}" Name.
+    Comment    Enter the Amount value by placing '- ' before entering the value in ammount Field of Edit Dialog box.
+    Wait For Element Visible    ${button.advanceSearch.edit}    ${DELAY}
+    Click Element    ${button.advanceSearch.edit}
+    Sleep    4s
+    Select From List By Label    ${list.activityDetailsDialog.findSessions}    All
+    Wait For Element Visible    ${table.alerts.filterAdvancedActivityFieldsDialog}    ${DELAY}
+    Comment    ${actualList}    Create List    0042279008    0910868498    1146.81
+    ${actualList}    Create List    1000.00
+    ${labelsList}    Create List    Total Credit Amount:
+    Wait For Element Visible    //label[contains(text(),'Total Credit Amount')]/parent::div/following-sibling::div/input    ${DELAY10}
+    Input Text    //label[contains(text(),'Total Credit Amount')]/parent::div/following-sibling::div/input    1000.00
+    Comment    ${actualList}    Create List    +nfiFEfbGfpE/9PACfqwfA==    2NCKbjsgQFNHeXIy+3qPGg==    1146.81
+    Comment    ${labelsList}    Create List    From Account:    To Account:    Amount:
+    Comment    Input Text    ${text.activityDetailsDialog.fromAccount}    +nfiFEfbGfpE/9PACfqwfA==
+    Comment    Input Text    ${text.activityDetailsDialog.toAccount}    2NCKbjsgQFNHeXIy+3qPGg==
+    Comment    Input Text    ${text.activityDetailDialog.amount}    1146.81
+    Wait For Element Visible    ${button.alerts.activityDetailsDialogOk}    ${DELAY}
+    Click Element    ${button.alerts.activityDetailsDialogOk}
+    Sleep    3s
+    Wait For Element Visible    //a[contains(text(),'Show Results')]    ${DELAY}
+    Click Element    //a[contains(text(),'Show Results')]
+    Wait Until Keyword Succeeds    1m    100ms    Any One Element Should Be Visible    //a[@title='Account Detail']    ${label.reports.dataTable.noMatchingData}
+    ${bstatus}=    Verify Element Present    ${label.reports.dataTable.noMatchingData}
+    Run Keyword And Continue On Failure    Run Keyword If    ${bstatus}==True    Fail    No Matching Data Found
+    ${tableColNo}    Get Column No From Table    ${table.fraudMatch.matchingRows}    Account
+    ${account}=    Get Cell Value    ${table.fraudMatch.matchingRows}    ${tableColNo}    1
+    Comment    Select an account which has more number of sessions
+    Select Item and view account detail from fraudMatch    ${account}
+    Select Window    ${windowName}
+    Sleep    4s
+    Comment    Compare the dispalyed Activity values in the Activities pane with Activity details used in Advance Search field.
+    Wait For Element Visible    ${label.accountDetail.activitiesPane.activitiesHeaderTitle}    ${DELAY}
+    ${ExpectedList}    Create List
+    ${activitiesCount}    CommonLibrary.Get Text    ${label.accountDetail.activitiesPane.activitiesHeaderTitle}
+    @{activitiesCount}    Split String    ${activitiesCount}    (
+    ${activitiesCount}    Replace String    @{activitiesCount}[1]    )    ${EMPTY}
+    @{labelsList}    Set Variable    ${labelsList}
+    ${list}    Get Activity body Values Based Upon Activity Short Name    ${shortName}    ${labelsList}
+    Lists Should Be Equal    ${actualList}    ${list}
+    Logout
+    [Teardown]    Stop Application
+
+Activity Details Searching Alerts_Case Insensitive
+    Login to Application    ${SUBDOMAINURL}    ${subdomainuser}    ${subdomainuserpassword}
+    MenuSelect    Alerts
+    ${filters}=    Create Dictionary    Activity=info
+    Enter And Validate Single Advanced Search Field    ${filters}    False    False
+    ${valuInActivityField}    Get Element Attribute Value    ${text.advanceSearch.activityValue}
+    ${ActualBelongedActivityList}    Create List    Account Number    Amount    From Account    From Account Type    Routing Number
+    ...    To Account
+    Wait For Element Visible    ${button.advanceSearch.edit}
+    Click Element    ${button.advanceSearch.edit}
+    Sleep    5s
+    Wait For Element Visible    ${table.alerts.filterAdvancedActivityFieldsDialog}    ${DELAY}
+    ${statusOfValidation1}    Verify and Validate the Attributes in Activity Details that Belongs to the Activity    ${valuInActivityField}    ${ActualBelongedActivityList}
+    Run Keyword If    '${statusOfValidation1}'!='Pass'    Fail    Activity Details dialog box does not have related attributes fields for Specified "${valuInActivityField}" Name.
+    Comment    verify search by given incasesensitive from account type.Giving From account type as "demand" (total lower case)and validates the records are displaying or not
+    Click Element    ${button.advanceSearch.edit}
+    Sleep    3s
+    Wait For Element Visible    ${table.alerts.filterAdvancedActivityFieldsDialog}    ${DELAY}
+    Input Text    ${text.activityDetailsDialog.fromAccountType}    demand
+    Click Element    ${button.alerts.activityDetailsDialogOk}
+    Sleep    3s
+    Click Element    //a[contains(text(),'Show Results')]
+    Comment    Sleep    10s
+    Wait Until Keyword Succeeds    1m    100ms    Any One Element Should Be Visible    //a[@title='Account Detail']    ${label.reports.dataTable.noMatchingData}
+    Wait For Element Visible    ${label.alerts.selectedRecord}    ${DELAY}
+    ${bstatus}=    Verify Element Present    ${label.reports.dataTable.noMatchingData}
+    Run Keyword And Continue On Failure    Run Keyword If    ${bstatus}==True    Fail    No Matching Data Found
+    ${tableColNo}    Get Column No From Table    ${table.alerts.matchingRows}    Account
+    ${account}=    Get Cell Value    ${table.alerts.matchingRows}    ${tableColNo}    1
+    Comment    Select an account which has more number of sessions
+    Select Item and view account detail    ${account}
+    Select Window    ${windowName}
+    Sleep    4s
+    Comment    Validate the account detail page opened or not
+    Wait For Element Visible    ${label.accountDetail.activitiesPane.activitiesHeaderTitle}    ${DELAY}
+    ${activitiesCount}    CommonLibrary.Get Text    ${label.accountDetail.activitiesPane.activitiesHeaderTitle}
+    @{activitiesCount}    Split String    ${activitiesCount}    (
+    ${activitiesCount}    Replace String    @{activitiesCount}[1]    )    ${EMPTY}
+    Comment    Check pattern matching for the From Account type \ in Activity pane of accountdetail page.
+    Comment    ${actualList}    Create List    Demand
+    @{list}    Get Label Matching List Values From Activity Pane    ${activitiesCount}    From Account Type:
+    ${list}    Set Variable    @{list}
+    ${statusOfMatchingPatteren}    Match Result Values To Pattern    ${list}    demand
+    Run Keyword If    '${statusOfMatchingPatteren}'!='True'    Fail    There is no single item present in Actual list as expected,But it is not.
+    Logout
+    Stop Application
+    Login to Application    ${SUBDOMAINURL}    ${subdomainuser}    ${subdomainuserpassword}
+    MenuSelect    Alerts
+    ${filters}=    Create Dictionary    Activity=info
+    Enter And Validate Single Advanced Search Field    ${filters}    False
+    ${valuInActivityField}    Get Element Attribute Value    ${text.advanceSearch.activityValue}
+    ${ActualBelongedActivityList}    Create List    Account Number    Amount    From Account    From Account Type    Routing Number
+    ...    To Account
+    Click Element    ${button.advanceSearch.edit}
+    Sleep    2s
+    Wait For Element Visible    ${table.alerts.filterAdvancedActivityFieldsDialog}    ${DELAY}
+    ${statusOfValidation1}    Verify and Validate the Attributes in Activity Details that Belongs to the Activity    ${valuInActivityField}    ${ActualBelongedActivityList}
+    Run Keyword If    '${statusOfValidation1}'!='Pass'    Fail    Activity Details dialog box does not have related attributes fields for Specified "${valuInActivityField}" Name.
+    Comment    verify search by given incasesensitive from account type.Giving From account type as "DEMAND" (total upper case)and validates the records are displaying or not
+    Click Element    ${button.advanceSearch.edit}
+    Sleep    3s
+    Wait For Element Visible    ${table.alerts.filterAdvancedActivityFieldsDialog}    ${DELAY}
+    Input Text    ${text.activityDetailsDialog.fromAccountType}    DEMAND
+    Click Element    ${button.alerts.activityDetailsDialogOk}
+    Sleep    3s
+    Click Element    //a[contains(text(),'Show Results')]
+    Comment    Sleep    10s
+    Wait Until Keyword Succeeds    1m    100ms    Any One Element Should Be Visible    //a[@title='Account Detail']    ${label.reports.dataTable.noMatchingData}
+    Wait For Element Visible    ${label.alerts.selectedRecord}    ${DELAY}
+    ${bstatus}=    Verify Element Present    ${label.reports.dataTable.noMatchingData}
+    Run Keyword And Continue On Failure    Run Keyword If    ${bstatus}==True    Fail    No Matching Data Found
+    Restore Default Columns
+    ${tableColNo}    Get Column No From Table    ${table.alerts.matchingRows}    Account
+    ${account}=    Get Cell Value    ${table.alerts.matchingRows}    ${tableColNo}    1
+    Comment    Select an account which has more number of sessions
+    Select Item and view account detail    ${account}
+    Select Window    ${windowName}
+    Sleep    4s
+    Comment    Validate the account detail page opened or not
+    Wait For Element Visible    ${label.accountDetail.activitiesPane.activitiesHeaderTitle}    ${DELAY}
+    ${activitiesCount}    CommonLibrary.Get Text    ${label.accountDetail.activitiesPane.activitiesHeaderTitle}
+    @{activitiesCount}    Split String    ${activitiesCount}    (
+    ${activitiesCount}    Replace String    @{activitiesCount}[1]    )    ${EMPTY}
+    Comment    Check pattern matching for the From Account type \ in Activity pane of accountdetail page.
+    Comment    ${actualList}    Create List    Demand
+    @{list}    Get Label Matching List Values From Activity Pane    ${activitiesCount}    From Account Type:
+    ${list}    Set Variable    @{list}
+    ${statusOfMatchingPatteren}    Match Result Values To Pattern    ${list}    DEMAND
+    Run Keyword If    '${statusOfMatchingPatteren}'!='True'    Fail    There is no single item present in Actual list as expected,But it is not.
+    Logout
+    [Teardown]    Stop Application
+
+Activity Details Searching FraudMatch_Details text area
+    Login to Application    ${SUBDOMAINURL}    ${subdomainuser}    ${subdomainuserpassword}
+    MenuSelect    Alerts
+    Wait For Element Visible    ${button.alerts.showResults}    ${DELAY}
+    Click Element    ${button.alerts.showResults}
+    Wait Until Keyword Succeeds    1m    100ms    Any One Element Should Be Visible    ${image.alerts.fraudMatchAction}    ${label.reports.dataTable.noMatchingData}
+    Comment    navigate to fraud match screen
+    ${tableColNo}    Get Column No From Table    ${table.fraudMatch.matchingRows}    Account
+    ${account}=    Get Cell Value    ${table.fraudMatch.matchingRows}    ${tableColNo}    2
+    Left Click On Table Row    ${table.alerts.matchingRows}    ${tableColNo}    ${account}
+    Wait For Element Visible    ${image.alerts.fraudMatchAction}
+    Click Element    ${image.alerts.fraudMatchAction}
+    Wait For Please Wait Option
+    Sleep    ${DELAY5}
+    Wait For New Window    2
+    @{windowTitles}=    Get Window Titles
+    Select Window    @{windowTitles}[1]
+    Maximize Browser Window
+    Wait For Element Visible    ${list.alerts.date}    ${DELAY}
+    Select From List By Label    ${list.alerts.date}    All Time
+    Sleep    3s
+    Wait For Element Visible    ${text.reports.advanceSearchSessionRange}    ${DELAY}
+    Simulate    ${link.common.riskRedAndYellow}    click
+    Sleep    4s
+    ${filters}=    Create Dictionary    Activity    ${EMPTY}
+    Enter And Validate Single Advanced Search Field    ${filters}    False    False
+    Wait For Element Visible    ${button.advanceSearch.edit}
+    Click Element    ${button.advanceSearch.edit}
+    Sleep    3s
+    Wait For Element Visible    ${table.alerts.filterAdvancedActivityFieldsDialog}    ${DELAY}
+    ${valueofAcountNumber}=    Set Variable    910868498
+    ${valueforFromAccount}=    Set Variable    42279008
+    ${fieldsToBeCheckedandValuesfortheFields}=    Create Dictionary    Account Number=${valueofAcountNumber}    From Account=${valueforFromAccount}
+    Validate Details Field is checked after Selecting the Fields on Activity Details Window    ${fieldsToBeCheckedandValuesfortheFields}
+    Wait For Element Visible    ${button.advanceSearch.edit}    ${DELAY}
+    Click Element    ${button.advanceSearch.edit}
+    Wait For Element Visible    ${table.alerts.filterAdvancedActivityFieldsDialog}    ${DELAY}
+    : FOR    ${iCnt}    IN RANGE    0    ${lenOfList}
+    \    Wait For Element Visible    //label[contains(text(),'@{fields}[${iCnt}]')]/parent::div/following-sibling::div/input
+    \    Clear Text    //label[contains(text(),'@{fields}[${iCnt}]')]/parent::div/following-sibling::div/input
+    \    Wait For Element Visible    //table[@id='filterAdvancedActivityFieldsDialogContentTable']//div[@class='dialogFooter']    ${DELAY}
+    \    Click Element    //table[@id='filterAdvancedActivityFieldsDialogContentTable']//div[@class='dialogFooter']
+    \    Sleep    1s
+    \    ${bStatus}=    Run Keyword And Return Status    Checkbox Should Be Selected    //label[contains(text(),'@{fields}[${iCnt}]')]/parent::div/input
+    \    Run Keyword If    ${bStatus}==True    Click Element    //label[contains(text(),'@{fields}[${iCnt}]')]/parent::div/input
+    Wait For Element Visible    ${button.alerts.activityDetailsDialogOk}    ${DELAY}
+    Click Element    ${button.alerts.activityDetailsDialogOk}
+    Sleep    2s
+    Wait For Element Visible    ${label.alerts.detailsCheckStatus}    ${DELAY}
+    ${bStatus}=    Run Keyword And Return Status    Checkbox Should Be Selected    ${label.alerts.detailsCheckStatus}
+    Run Keyword If    ${bStatus}==True    Fail    Check Box for Details Field is not disabled after deselcting All the Fields on Activity Details Window.
+    ${textDisplayedOnDetailsArea}=    CommonLibrary.Get Text    activityFieldList
+    @{fieldNameandValue}=    Set Variable    ${fieldNameandValue}
+    : FOR    ${fieldNameandValue}    IN    @{fieldNameandValue}
+    \    Should Not Contain    ${textDisplayedOnDetailsArea}    ${fieldNameandValue}    The value ${fieldNameandValue} is displayed on Details area even after deselecting all the text fields on Ac tivity details window.
+    Logout
+    [Teardown]    Stop Application
+
+Select Record and View Account Detail For ACHRDFI
+    [Arguments]    ${recipientName}=''    ${row}=0
+    ${tableColNo}    Get Column No From Table    ${table.alerts.matchingRows}    Recipient Name
+    Left Click On Table Row    ${table.matchingRows}    ${tableColNo}    ${recipientName}
+    ${bStatus}    Wait For Element Visible    ${button.alerts.accountDetailIcon}
+    Run Keyword Unless    ${bStatus}    Fail    Account Details Icon is not displayed in the Page.
+    Click Element    ${button.alerts.accountDetailIcon}
+    ${bStatus}    Wait For New Window    2
+    Close Alert Message
+    @{windowNames}=    Get Window Names
+    Run Keyword Unless    ${bStatus}    Fail    account Details window is not opened.
+    : FOR    ${windowName}    IN    @{windowNames}
+    \    ${bstatus}=    String Should Contain    ${windowName}    acc
+    \    ${expectedWindowName}    Run Keyword If    ${bstatus}==True    Set Variable    ${windowName}
+    \    Run Keyword If    ${bstatus}==True    Exit For Loop
+    [Return]    ${expectedWindowName}

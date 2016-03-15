@@ -1,0 +1,402 @@
+*** Settings ***
+Resource          super.txt
+
+*** Keywords ***
+Read Previous Query Data
+    [Arguments]    ${iCount}    ${queriedValues}
+    [Documentation]    1. Hovers Mouse on the 'Previous searches' drop down & reads \ all the values in it to a list.
+    ${queriedSubValuesCount}=    Get Matching Xpath Count    //div[@id='pqsDetail_0']/table/tbody/tr[${iCount}]/td
+    : FOR    ${iCounter}    IN RANGE    1    ${queriedSubValuesCount}+1
+    \    Comment    Click Element    ${list.reports.riskdropdown}
+    \    Click Element    //div[@id='queries']/div
+    \    Mouse Over    ${list.accounts.previoussearches.dropdownitem}
+    \    Mouse Over    ${list.accounts.previoussearches.dropdownitem}
+    \    Mouse Over    ${list.accounts.previoussearches.dropdownitem}
+    \    Mouse Over    ${list.accounts.previoussearches.dropdownitem}
+    \    ${queriedValue}=    Selenium2Library.Get Text    //div[@id='pqsDetail_0']/table/tbody/tr[${iCount}]/td[${iCounter}]
+    \    ${lengthOfQueriedValue}=    Get Length    ${queriedValue}
+    \    Run Keyword Unless    ${lengthOfQueriedValue}!=0    Click Element    ${list.reports.riskdropdown}
+    \    Mouse Over    ${list.accounts.previoussearches.dropdownitem}
+    \    ${queriedValue}=    CommonLibrary.Get Text    //div[@id='pqsDetail_0']/table/tbody/tr[${iCount}]/td[${iCounter}]
+    \    Append To List    ${queriedValues}    ${queriedValue}
+
+Validate Filter Data
+    [Arguments]    ${activityPaneList}    ${filterVals}
+    Log    ${filterVals}
+    ${actualFilterList}=    Create List
+    : FOR    ${val}    IN    ${filterVals}
+    \    ${bStatus}=    Run Keyword And Return Status    String Should Contain    ${activityPaneList}    ${val}
+    \    Run Keyword If    '${bStatus}'=='True'    Append To List    ${actualFilterList}    ${val}
+    \    Set Test Variable    ${bStatus}    ${bStatus}
+    \    Set Test Variable    ${actualFilterList}    ${actualFilterList}
+
+Verify Retrieved Data
+    [Documentation]    Validates the account detail page is displayed by the desired country and Risk factor.
+    ${account}=    Get Cell Value    //div[@id='tAccounts']${table.alerts.matchingRows}    1    1
+    Select Item and view account detail For Accounts    ${account}
+    Select Window    ${windowName}
+    @{riskColors}=    Set Variable    red    yellow    blue    green
+    : FOR    ${riskColor}    IN    @{riskColors}
+    \    ${currentSessionNumber}=    Get Session Num With Color    ${header.accountDetail.sessionDetails}    ${riskColor}
+    \    Run Keyword If    ${currentSessionNumber}!=0    Exit For Loop
+    Run Keyword Unless    ${currentSessionNumber}!=0    Fail    No session with @{riskColors}
+    Log    ${currentSessionNumber}
+    Select Session    ${currentSessionNumber}
+    Sleep    5s
+    Wait Until Page Contains Element    //td[@id="ga_riskFactors_title__0"]/span[@class="redAlert"]    70000
+    ${getCountryName}=    CommonLibrary.Get Text    //div[@class='sessOverviewTableBody']//tr[6]/td[3]
+    ${bStatus}=    String Should Contain    ${getCountryName}    panama
+    Run Keyword If    ${bStatus}!=True    Fail    The selected Account does not contain "${getCountryName}" under Risk Factor
+    ${getCityName}=    CommonLibrary.Get Text    //div[@class='sessOverviewTableBody']//tr[8]/td[3]
+    ${bstatus}=    String Should Contain    ${getCityName}    panama
+    Run Keyword If    ${bstatus}!=True    Fail    Account Detail page does not contain the city for which the search is performed.
+    Select Window By Title    FraudMAP - Main
+    Sleep    2s
+
+Validate Table Values and CSV File Values in Accounts
+    [Arguments]    ${exportimportfile}    ${windowtitle}
+    [Documentation]    Validate The Csv File Values And Table Values In Alerts Page
+    Select Window    ${windowtitle}
+    Sleep    4s
+    Log    Mouse Over after download
+    Mouse Over    ${link.adminUsers.showResults}
+    Sleep    5s
+    ${headersList}=    Get Table Columns Into List    ${table.accounts.searchResults.tableList}
+    @{headersList}=    Set Variable    ${headersList}
+    ${csvColumns}=    Get Csv File Row Values Into List    ${exportimportfile}    1
+    Sleep    4s
+    ${totalRows}=    Get Table Row Count For IE in Cases
+    Log    ${totalRows}
+    : FOR    ${header}    IN    @{headersList}
+    \    Log    ${header}
+    \    List Should Contain Value    ${csvColumns}    ${header}    The CSV File Columns Names Not Having table Columns Name ${header}
+    \    ${csvlist}=    Get Csv File Column Values Into List    ${exportimportfile}    ${header}
+    \    ${tablelist}=    Get Table Values Into List By Down Arrow    ${table.accounts.searchResults.tableList}    //div[@id='ajs_T_AccountsTable_tAccounts_F_AccountsTable_tAccounts_bar_knob']    //div[@id='ajs_T_AccountsTable_tAccounts_F_AccountsTable_tAccounts_bar_container']    ${header}
+    \    ...    False    ${totalRows}
+    \    Run Keyword And Continue On Failure    List Comparison Partially    ${csvlist}    ${tablelist}
+
+Read Risk Factor Value
+    [Documentation]    1. Reads the risk factor value from the 'heatmap' headers in the 'accountDetails' page.
+    Wait Until Page Contains Element    ga_timeline_exp    5s
+    Click Element    ga_timeline_exp
+    Sleep    5s
+    Press Down key    ${table.accountDetail.heatmapHeaders}
+    ${riskFactorList}=    Get Timeline Headers Subheaders    ${table.accountDetail.heatmapHeaders}    Risk Factor    1
+    Log    ${riskFactorList}
+    ${bStatus}=    Run Keyword And Return Status    Is List Contains Value    ${riskFactorList}    ACH Recipient
+    Run Keyword If    ${bStatus}==True    Set Test Message    Risk Factor value ACHRcp given in filter profiles exists in search results
+    Run Keyword If    ${bStatus}==False    Set Test Message    Risk Factor value ACHRcp given in filter profiles does not contain in search results
+
+Validate Activity Filter
+    [Arguments]    ${filterVal}
+    sleep    1s
+    Selenium2Library.Mouse Down    //img[@id='ga_activityDetails_expand_collaps_all_activities']
+    sleep    2s
+    ${activities4mactivitypane}=    Get Activities Activity Popup    ${table.accountDetail.activityPaneActivities}
+    ${bStatus}=    Run Keyword And Return Status    List Should Contain Value    ${activities4mactivitypane}    ${filterVal}
+    Selenium2Library.Mouse Down    //img[@id='ga_activityDetails_expand_collaps_all_activities']
+    Set Test Variable    ${bStatus}    ${bStatus}
+
+GetStateAndCity
+    [Arguments]    ${SearchCriteria}    ${names}    ${listofheaders}    ${gettimelineheaderrows}
+    @{gettimelineheaderrows}=    Set Variable    ${gettimelineheaderrows}
+    ${length}=    Get Length Of List    ${gettimelineheaderrows}
+    Comment    ${templist}=    Split String    ${listofheaders}    ,
+    : FOR    ${icnt}    IN RANGE    0    ${length}
+    \    ${listVslue}=    Set Variable    @{gettimelineheaderrows}[${icnt}]
+    \    @{splitString}=    Split String    ${listVslue}    ,
+    \    Log    @{splitString}[0]
+    \    ${names}=    Convert To String    ${names}
+    \    Run Keyword And Continue On Failure    Run Keyword If    '${SearchCriteria}'=='State'    String Should Contain    ${names}    @{splitString}[0]
+    \    ${cityName}=    Convert To String    @{splitString}[1]
+    \    Run Keyword And Continue On Failure    Run Keyword If    '${SearchCriteria}'=='City'    String Should Contain    ${names}    ${cityName[1:]}
+
+GetActivityDescriptions
+    [Arguments]    ${activities}
+    @{filterVals}=    Split String    ${activities}    ,
+    Input Text    ${text.accounts.firstProfileDrpDwn.textBox}    ${activities},
+    ${val}=    Set Variable    ${EMPTY}
+    : FOR    ${counter}    IN RANGE    1    5
+    \    Sleep    2s
+    \    ${bStatus}=    Verify Element Visible    //div[@class='rich-sb-ext-decor-2']//table
+    \    Run Keyword If    ${bStatus}==True    Exit For Loop
+    : FOR    ${counter}    IN    @{filterVals}
+    \    Comment    ${bStatus}=    Run Keyword And Return Status    Wait Until Element Is Visible    //div[@class='rich-sb-ext-decor-2']//table    20s
+    \    ${desc}=    CommonLibrary.Get Text    //div[@class='rich-sb-ext-decor-2']//table//td[contains(text(),'${counter}')]/../td[3]
+    \    ${val}=    Set Variable    ${val},${desc}
+    ${val}=    Set Variable    ${val[1:]}
+    Click Element    ${text.accounts.firstProfileDrpDwn.textBox}
+    Press Control And Key    ${text.accounts.firstProfileDrpDwn.textBox}    a
+    Input Text    ${text.accounts.firstProfileDrpDwn.textBox}    ${activities}
+    [Return]    ${val}
+
+Validate Multiple Values in ModeDefs
+    [Arguments]    ${filters}    ${filterField}
+    Select From List By Label    ${list.accounts.profile1.firstdropdown}    ${filterField}
+    Wait Until Page Contains Element    ${text.accounts.firstProfileDrpDwn.textBox}    10s
+    Comment    Clear Text    ${text.accounts.firstProfileDrpDwn.textBox}
+    Comment    Input Text    ${text.accounts.firstProfileDrpDwn.textBox}    ${filters['${filterField}']}
+    Wait Until Element Is Visible    ${list.accounts.profile1.seconddropdown}    30s
+    Comment    Select From List    ${list.accounts.profile1.seconddropdown}    Risk Factor
+    Comment    Wait Until Element Is Visible    //input[@id='riskFactorTypes']    20s
+    Comment    Clear Text    //input[@id='riskFactorTypes']
+    Comment    Input Text    //input[@id='riskFactorTypes']    ACHRcp
+    @{selectedValue}=    Get Selected List Labels    ${list.accounts.profile1.firstdropdown}
+    ${selectedValue}=    Set Variable    @{selectedValue}
+    ${filterValue}=    Get Value    ${text.accounts.profile1.firstDropdown.textBox}
+    ${filterValue}=    Run Keyword If    '${selectedValue}'=='Activity'    GetActivityDescriptions    ${filters['${filterField}']}    ELSE    Set Variable
+    ...    ${filters['${filterField}']}
+    Click Element    //a[contains(text(),'Show Results')]
+    Sleep    3s
+    ${hidebuttonstatus}=    Verify Element Visible    ${button.reports.searching.hide}
+    Run Keyword If    '${hidebuttonstatus}'=='True'    Checking Status Of Search Image Button
+    Click Element    //a[contains(text(),'Show Results')]
+    Sleep    10s
+    Close Alert Message
+    Sleep    30s
+    Close Alert Message
+    AutoItLibrary.Mouse Move    100    100
+    ${account}=    Get Cell Value    ${table.alerts.matchingRows}    1    1
+    Select Item and view account detail For Accounts    ${account}
+    Select Window    ${windowName}
+    Sleep    7s
+    Run Keyword If    '${filterField}'=='Country'    Simulate    ga_timeline_exp    click
+    Run Keyword If    '${filterField}'=='Country'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='Country'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='IPType'    Simulate    ga_timeline_exp    click
+    Run Keyword If    '${filterField}'=='IPType'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='IPType'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='IPType'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='IPType'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='IPType'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='IPType'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='IPType'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='IPType'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='IPType'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='IPType'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='IPType'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='IPType'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='IPType'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='IPType'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='IPType'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='OS Browser'    Simulate    ga_timeline_exp    click
+    Run Keyword If    '${filterField}'=='OS Browser'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='OS Browser'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='OS Browser'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='OS Browser'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='OS Browser'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='OS Browser'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='OS Browser'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='OS Browser'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='OS Browser'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='OS Browser'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='Provider'    Simulate    ga_timeline_exp    click
+    Run Keyword If    '${filterField}'=='Provider'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='Provider'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='Provider'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='Provider'    Press Down Key    ga_timelineTable_viewBody
+    Run Keyword If    '${filterField}'=='Provider'    Press Down Key    ga_timelineTable_viewBody
+    ${timelineCountryValues}=    Get Timeline Headers Subheaders    ${table.accountDetail.heatmapHeaders}    ${filterField}    1
+    @{filterValues}=    Split String    ${filterValue}    ,
+    : FOR    ${value}    IN    @{filterValues}
+    \    ${bStatus}=    Run Keyword And Return Status    List Should Contain Value    ${timelineCountryValues}    ${value}
+    \    Run Keyword Unless    ${bStatus}==False    Exit For Loop
+    Log    ${bStatus}
+    Run Keyword Unless    ${bStatus}==True    Fail    Search results does not contain ${filterValues}
+
+Validate Multiple Values for State and City
+    [Arguments]    ${filters}    ${filterField}
+    [Documentation]    1. Verify retrieved records matches with the database records for the same filter values in State & City 'Advanced \ \ \ \ \ Filter Modefs'.
+    Comment    Select State/City given in the ${filterField} from the second dropdown in the first profile
+    Select From List    ${list.accounts.profile1.seconddropdown}    ${filterField}
+    Sleep    2s
+    Comment    Enter multiple values for the modedef
+    Run Keyword If    '${filterField}'=='City'    Input Text    activity_0_7    ${filters['${filterField}']}
+    Run Keyword If    '${filterField}'=='State'    Input Text    activity_0_6    ${filters['${filterField}']}
+    ${filterValue}=    Set Variable    ${filters['${filterField}']}
+    Select From List    ${list.accounts.profile2.firstdropdown}    ${filterField}
+    Click Element    //a[contains(text(),'Show Results')]
+    Sleep    5s
+    ${hidebuttonstatus}=    Verify Element Visible    ${button.reports.searching.hide}
+    Run Keyword If    '${hidebuttonstatus}'=='True'    Checking Status Of Search Image Button
+    Click Element    //a[contains(text(),'Show Results')]
+    Sleep    15s
+    Close Alert Message
+    AutoItLibrary.Mouse Move    100    100
+    ${account}=    Get Cell Value    ${table.alerts.matchingRows}    1    1
+    Comment    Select specific account from the search results table
+    Select Item and view account detail For Accounts    ${account}
+    Select Window    ${windowName}
+    Sleep    5s
+    Maximize Browser Window
+    Collapse Time Line Details Pane
+    Comment    Get timeline values for selected filter field in Accounts page
+    Press Down Key    ga_timelineTable_viewBody
+    Press Down Key    ga_timelineTable_viewBody
+    Press Down Key    ga_timelineTable_viewBody
+    @{timeLineValues}=    Get Timeline Headers Subheaders    ${table.accountDetail.heatmapHeaders}    State, City    1
+    ${stateOrCityValues}=    Create List
+    Comment    Validate multiple values given in the filter field matches with the specified account selected in the search results table
+    : FOR    ${value}    IN    @{timeLineValues}
+    \    ${stateOrCityValue}=    Split String    ${value}    ,
+    \    Run Keyword If    '${filterField}'=='State'    Append To List    ${stateOrCityValues}    ${stateOrCityValue[0]}    ELSE
+    \    ...    Append To List    ${stateOrCityValues}    ${stateOrCityValue[1][1:]}
+    Log    ${stateOrCityValues}
+    @{filterValues}=    Split String    ${filterValue}    ,
+    : FOR    ${value}    IN    @{filterValues}
+    \    ${bStatus}=    Run Keyword And Return Status    List Should Contain Value    ${stateOrCityValues}    ${value}
+    \    Run Keyword Unless    ${bStatus}==False    Exit For Loop
+    Run Keyword Unless    ${bStatus}==True    Fail    Search results does not contain ${filterVals}
+    [Teardown]
+
+Mouse Scroll on Accounts Table
+    [Documentation]    1. Scrolls mouse \ over the accounts in the 'Results' table
+    : FOR    ${iCounter}    IN RANGE    0    2
+    \    Mouse Scroll    ajs_T_AccountsTable_tAccounts_F_AccountsTable_tAccounts_cell_R${iCounter}C6
+
+Clicking Results Table Scroll Down Knob
+    [Documentation]    1. Clicks the Results table Scroll Down Knob.
+    : FOR    ${iCnt}    IN RANGE    0    6
+    \    Click Element    ${table.mouseUp.scrollToTableItem}
+
+Get Column Names in Accounts
+    [Documentation]    Returns column headers in Accounts page
+    ${actualColumnHeaders}=    Create List
+    : FOR    ${index}    IN RANGE    1    ${columnCount}-3
+    \    ${columnName}=    CommonLibrary.Get Text    //div[@id='tAccounts']//table/tbody/tr/td[${index}]/div/div
+    \    Append To List    ${actualColumnHeaders}    ${columnName}
+    Log    ${actualColumnHeaders}
+    [Return]    ${actualColumnHeaders}
+
+Search Criteria
+    [Arguments]    ${label1}    ${label2}    ${fromdate}    ${todate}    ${activityval}    ${riskfactorval}
+    Select From List By Label    ${list.accounts.profile1.firstdropdown}    ${label1}
+    Sleep    2s
+    Wait Until Page Contains Element    //div[@id='mainForm:activities']/input    5s
+    Sleep    5s
+    Wait Until Page Contains Element    activityTypesV5    7s
+    Input Text    activityTypesV5    ${activityval}
+    Sleep    2s
+    Wait Until Page Contains Element    ${text.alerts.fromDate}    5s
+    Comment    Input Text    ${text.alerts.fromDate}    ${fromdate}
+    Sleep    2s
+    Wait Until Page Contains Element    ${text.alerts.toDate}    5s
+    Comment    Input Text    ${text.alerts.toDate}    ${todate}
+    Sleep    2s
+    Wait Until Page Contains Element    ${list.accounts.profile1.seconddropdown}    10s
+    Comment    IE    Input Text    ${text.accounts.firstProfileDrpDwn.textBox}    ${activityval}
+    Select From List By Label    ${list.accounts.profile1.seconddropdown}    ${label2}
+    Sleep    7s
+    Wait Until Page Contains Element    riskFactorTypes    5s
+    Comment    Input Text    ${text.accounts.profile1.secondDropDwn.textBox}    ${riskfactorval}
+    Input Text    riskFactorTypes    ${riskfactorval}
+    Sleep    2s
+    Comment    Wait Until Page Contains Element    ${text.alerts.fromDate}    5s
+    Comment    Input Text    ${text.alerts.fromDate}    ${fromdate}
+    Comment    Sleep    2s
+    Comment    Wait Until Page Contains Element    ${text.alerts.toDate}    5s
+    Comment    Input Text    ${text.alerts.toDate}    ${todate}
+    Sleep    2s
+    Wait Until Page Contains Element    ${list.accounts.profile2.firstdropdown}
+    Comment    Select From List By Label    ${list.accounts.profile2.firstdropdown}    Country
+    Comment    Input Text    activity_1_5    united kingdom
+
+Validate Search results on Account Table for VAC and SYS
+    [Documentation]    1. validates the search results on accounts table for VAC and SYS.
+    ${actualRecordsCountInVac}=    Get Table Rows Count By Scrolling    ${table.accounts.searchResultsTable.knob}    ${table.accounts.searchresults.barContainer}
+    Reload Page
+    Sleep    1s
+    ${actualRecordsCountInVac}=    Convert To Integer    ${actualRecordsCountInVac}
+    AutoItLibrary.Mouse Move    1200    550
+    Comment    Reads the session values displayed from the column '# of Sessions' from Accounts table on Vac domain.
+    ${sessionValuesDisplayedOnVac}=    Create List
+    : FOR    ${iCount}    IN RANGE    1    ${actualRecordsCountInVac}+1
+    \    ${sessionValue}=    CommonLibrary.Get Text    //div[contains(@id,'tAccounts_F_AccountsTable') and contains(@id,'C2') and contains(@class,'Selected')]
+    \    Append To List    ${sessionValuesDisplayedOnVac}    ${sessionValue}
+    \    Press Down Key    //div[contains(@id,'tAccounts_F_AccountsTable') and contains(@id,'C2') and contains(@class,'Selected')]
+    Close Alert Message
+    AutoItLibrary.Mouse Move    100    100
+    ${account}=    Get Cell Value    ${table.alerts.matchingRows}    4    1
+    Select Item and view account detail    ${account}
+    Select Window    ${windowName}
+    ${countryAndStateCountOnVac}=    Get Country And State Count
+    Set Global Variable    ${countryAndStateCountOnVac}
+    Set Global Variable    ${sessionValuesDisplayedOnVac}
+    [Return]    ${countryAndStateCountOnVac}    ${sessionValuesDisplayedOnVac}
+
+Retrieve Search Results
+    [Documentation]    1. Retreives the search results
+    Simulate Or Click Element    ${link.adminUsers.showResults}
+    Sleep    20s
+    Wait Until Page Contains Element    ${text.account.totalRows}    20s    Accounts page does not contain no.of rows displayed.
+    ${rowsCount}=    CommonLibrary.Get Text    ${text.account.totalRows}
+    ${bStatus}=    Verify Element Visible    ${label.accounts.dataTable.noMatchingData}
+    Comment    Verifing "No Matching Data Found" is visible or not if total rows is zero.
+    Run Keyword And Continue On Failure    Run Keyword If    ${bStatus}==True    Set Test Message    No Matching Data Found
+    ${domainValues}=    Run Keyword If    ${bStatus}==False    Validate Search results on Account Table for VAC and SYS
+    Sleep    2s
+    [Return]    ${rowsCount}    ${domainValues}
+
+Get Country And State Count
+    [Documentation]    1. Returns the \ Country values, stateorcityvalues, country count, stateorcity count & totalnumberofsessions of an account as a list from the accountdetails page.
+    Comment    Wait Until Page Contains Element    ${image.accountDetail.expandOrCollapseTimeline}    100    page does not contain \ sessions.
+    Sleep    10s
+    Click Element    ${link.accountDetail.accountInfo}
+    ${totalNumberOfSessions}=    CommonLibrary.Get Text    //div[@id='accountExternalInfo']//td/div
+    Click Element    ${link.accountDetail.accountInfo}
+    Sleep    2s
+    Click Element    ${image.accountDetail.expandOrCollapseTimeline}
+    Sleep    2s
+    ${countryValues}=    Get Timeline Headers Subheaders    ${table.accountDetail.heatmapHeaders}    Country    1
+    @{timeLineValues}=    Get Timeline Headers Subheaders    ${table.accountDetail.heatmapHeaders}    State, City    1
+    ${stateOrCityValues}=    Create List
+    : FOR    ${value}    IN    @{timeLineValues}
+    \    ${stateOrCityValue}=    Split String    ${value}    ,
+    \    Append To List    ${stateOrCityValues}    ${stateOrCityValue[0]}
+    ${countryCount}=    Get Length Of List    ${countryValues}
+    ${stateCount}=    Get Length Of List    ${stateOrCityValues}
+    [Return]    ${totalNumberOfSessions}    ${countryCount}    ${stateCount}    ${countryValues}    ${stateOrCityValues}
+
+GetSelectedRecordAccountDetails
+    [Arguments]    ${sourceList}
+    [Documentation]    1. Reads the \ accountName,sessionCount,fromDate,toDate of an account to a list and retuns the list.
+    Sleep    30s
+    ${accountName}=    CommonLibrary.Get Text    ${label.accounts.accountName}
+    Click Element    ${label.accounts.accountName}
+    Sleep    5s
+    Comment    Verifies the account name in account details page with source table
+    List Should Contain Value    ${sourceList}    ${accountName}
+    Page Should Contain Element    ${label.accounts.timelineLabel}
+    ${selectAccountDetails}=    Create List
+    Comment    Verify values from the selected record in Accounts page matches with the values displayed in the account details page
+    ${sessionCount}=    CommonLibrary.Get Text    //div[@id="accountExternalInfo"]/table/tbody/tr/td[1]
+    Select Session    1
+    Sleep    5s
+    ${fromDate}=    CommonLibrary.Get Text    //div[@class="sessOverviewTableBody"]/table//tr[2]/td[3]
+    ${fromDate}=    Split String    ${fromDate}    \    1
+    log    ${fromDate}
+    ${fromDate}    Get From List    ${fromDate}    1
+    Select Session    ${sessionCount}
+    Sleep    5s
+    ${toDate}=    CommonLibrary.Get Text    //div[@class="sessOverviewTableBody"]/table//tr[2]/td[3]
+    ${toDate}=    Split String    ${toDate}    \    1
+    log    ${toDate}
+    ${toDate}=    Get From List    ${toDate}    1
+    Append To List    ${selectAccountDetails}    ${accountName}    ${sessionCount}    ${fromDate}    ${toDate}    ${accountName}
+    log    ${selectAccountDetails}
+    [Return]    ${selectAccountDetails}
+
+Select Item and view account detail For Accounts
+    [Arguments]    ${account}
+    Sleep    3s
+    Left Click On Table Row    ${table.matchingRows}    1    ${account}
+    Wait Until Page Contains Element    ${button.alerts.accountDetailIcon}    5s
+    Page Should Contain Element    ${button.alerts.accountDetailIcon}
+    Click Element    ${button.alerts.accountDetailIcon}
+    Sleep    7s
+    @{windowNames}=    Get Window Names
+    Comment    Set Test Variable    ${windowname}    @{windownames}[1]
+    : FOR    ${windowName}    IN    @{windowNames}
+    \    ${bstatus}=    String Should Contain    ${windowName}    acc
+    \    Run Keyword If    ${bstatus}==True    Exit For Loop
+    Set Test Variable    ${windowName}    ${windowName}
